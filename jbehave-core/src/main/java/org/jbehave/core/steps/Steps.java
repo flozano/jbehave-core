@@ -160,29 +160,48 @@ public class Steps implements CandidateSteps {
     public List<StepCandidate> listCandidates() {
         List<StepCandidate> candidates = new ArrayList<StepCandidate>();
         for (Method method : allMethods()) {
-            if (method.isAnnotationPresent(Given.class)) {
-                Given annotation = method.getAnnotation(Given.class);
-                String value = annotation.value();
-                int priority = annotation.priority();
-                addCandidatesFromVariants(candidates, method, GIVEN, value, priority);
-                addCandidatesFromAliases(candidates, method, GIVEN, priority);
-            }
-            if (method.isAnnotationPresent(When.class)) {
-                When annotation = method.getAnnotation(When.class);
-                String value = annotation.value();
-                int priority = annotation.priority();
-                addCandidatesFromVariants(candidates, method, WHEN, value, priority);
-                addCandidatesFromAliases(candidates, method, WHEN, priority);
-            }
-            if (method.isAnnotationPresent(Then.class)) {
-                Then annotation = method.getAnnotation(Then.class);
-                String value = annotation.value();
-                int priority = annotation.priority();
-                addCandidatesFromVariants(candidates, method, THEN, value, priority);
-                addCandidatesFromAliases(candidates, method, THEN, priority);
+            // Process directly declared methods: declaring method is
+            // same as implementing method
+            processCandidateMethod(method, method, candidates);
+
+            // Process annotated methods in interfaces
+            for (Class<?> intf : method.getDeclaringClass().getInterfaces()) {
+                try {
+                    Method interfaceMethod = intf.getMethod(method.getName(), method.getParameterTypes());
+                    processCandidateMethod(interfaceMethod, method, candidates);
+                } catch (NoSuchMethodException e) {
+                    // OK, this interface doesn't implement this method
+                } catch (SecurityException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
         return candidates;
+    }
+    
+    private void processCandidateMethod(Method declaringMethod,
+            Method actualMethod, List<StepCandidate> candidates) {
+        if (declaringMethod.isAnnotationPresent(Given.class)) {
+            Given annotation = declaringMethod.getAnnotation(Given.class);
+            String value = annotation.value();
+            int priority = annotation.priority();
+            addCandidatesFromVariants(candidates, actualMethod, GIVEN, value, priority);
+            addCandidatesFromAliases(candidates, actualMethod, GIVEN, priority);
+        }
+        if (declaringMethod.isAnnotationPresent(When.class)) {
+            When annotation = declaringMethod.getAnnotation(When.class);
+            String value = annotation.value();
+            int priority = annotation.priority();
+            addCandidatesFromVariants(candidates, actualMethod, WHEN, value, priority);
+            addCandidatesFromAliases(candidates, actualMethod, WHEN, priority);
+        }
+        if (declaringMethod.isAnnotationPresent(Then.class)) {
+            Then annotation = declaringMethod.getAnnotation(Then.class);
+            String value = annotation.value();
+            int priority = annotation.priority();
+            addCandidatesFromVariants(candidates, actualMethod, THEN, value, priority);
+            addCandidatesFromAliases(candidates, actualMethod, THEN, priority);
+        }
     }
 
     private void addCandidatesFromVariants(List<StepCandidate> candidates, Method method, StepType stepType, String value, int priority) {
